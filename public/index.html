@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f5">
+  <title>Speedle</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">speedle<span>.</span></a>
+    <div class="top-actions">
+      <button id="settingsToggle" class="quiet-button" type="button">Settings</button>
+      <button id="newGame" class="solid-button" type="button">New game</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="play-area">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow" id="modeLabel">UNLIMITED</p>
+          <h1 id="gameTitle">Speedle</h1>
+          <p id="gameSubtitle" class="muted">Guess the hidden word.</p>
+        </div>
+        <div class="status" id="status">Ready</div>
+      </div>
+
+      <div id="board" class="board" aria-label="Game board"></div>
+      <p id="message" class="message" role="status"></p>
+
+      <div class="keyboard" id="keyboard" aria-label="On-screen keyboard"></div>
+      <div class="play-actions">
+        <button id="submitGuess" class="solid-button" type="button">Submit guess</button>
+        <button id="clearGuess" class="quiet-button" type="button">Clear</button>
+      </div>
+    </section>
+
+    <aside id="settingsPanel" class="settings-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">CONTROL PANEL</p>
+          <h2>Configuration</h2>
+        </div>
+        <button id="settingsClose" class="quiet-button" type="button" aria-label="Close settings">Close</button>
+      </div>
+
+      <label>API base URL
+        <input id="apiBase" type="url" value="/api/v1" spellcheck="false">
+      </label>
+      <label>Dictionary
+        <select id="dictionary"><option value="wordle">Loading dictionaries…</option></select>
+      </label>
+      <div class="two-col">
+        <label>Game mode
+          <select id="mode">
+            <option value="unlimited">Unlimited</option>
+            <option value="daily">Daily</option>
+          </select>
+        </label>
+        <label>Word length
+          <input id="length" type="number" min="2" max="15" value="5">
+        </label>
+      </div>
+      <div class="two-col">
+        <label>Maximum attempts
+          <input id="maxAttempts" type="number" min="1" max="20" value="6">
+        </label>
+        <label>Hard mode
+          <select id="hardMode">
+            <option value="false">Off</option>
+            <option value="true">On</option>
+          </select>
+        </label>
+      </div>
+      <label>Profanity filter
+        <select id="profanity">
+          <option value="strict">Strict (default)</option>
+          <option value="off">Off</option>
+        </select>
+      </label>
+      <div class="section-rule"></div>
+      <p class="eyebrow">DISPLAY</p>
+      <label class="check-row"><input id="keyboardEnabled" type="checkbox" checked> On-screen keyboard</label>
+      <label class="check-row"><input id="colorHints" type="checkbox" checked> Color feedback</label>
+      <label class="check-row"><input id="highContrast" type="checkbox"> High contrast</label>
+      <label class="check-row"><input id="showLabels" type="checkbox"> Text labels on tiles</label>
+      <div class="section-rule"></div>
+      <p class="eyebrow">API UTILITIES</p>
+      <button id="refreshDictionaries" class="wide-button" type="button">Refresh dictionary list</button>
+      <button id="dictionaryInfo" class="wide-button" type="button">Get dictionary info</button>
+      <button id="apiHealth" class="wide-button" type="button">Check API health</button>
+      <label>Word to validate
+        <input id="validateWord" type="text" maxlength="15" placeholder="Enter a word">
+      </label>
+      <button id="validateButton" class="wide-button" type="button">Validate word</button>
+      <button id="randomWord" class="wide-button" type="button">Get random word</button>
+      <div class="two-col">
+        <label>Evaluation guess<input id="evalGuess" type="text" maxlength="15" placeholder="guess"></label>
+        <label>Evaluation answer<input id="evalAnswer" type="text" maxlength="15" placeholder="answer"></label>
+      </div>
+      <button id="evaluateButton" class="wide-button" type="button">Evaluate guess</button>
+      <pre id="apiOutput" class="api-output">API responses appear here.</pre>
+      <p class="footnote">Games are stateless on the server. Your encrypted game token is stored locally in this browser.</p>
+    </aside>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

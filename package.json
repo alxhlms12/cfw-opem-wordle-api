@@ -1,0 +1,15 @@
+{
+  "name": "speedle",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "dictionaries:build": "node scripts/build-dictionaries.mjs",
+    "check": "node --check src/index.js && node --check scripts/build-dictionaries.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
