@@ -25,3 +25,12 @@ test("hard mode enforces yellow letters and counts", () => {
   assert.equal(validateHardMode("cello", history).valid, false);
   assert.equal(validateHardMode("hotel", history).valid, true);
 });
+
+
+test("evaluates accented words by Unicode character rather than UTF-16 units", () => {
+  assert.deepEqual(evaluateGuess("café", "cane"), ["correct", "correct", "absent", "absent"]);
+});
+
+test("normalizes language-specific casing", () => {
+  assert.equal(normalizeWord("I", "tr"), "ı");
+});

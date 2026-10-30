@@ -1,25 +1,28 @@
 const API = "/api/v1";
 const cache = new Map();
+const dictionaryCache = new Map();
+const availabilityCache = new Map();
+const REMOTE_CACHE_SECONDS = 86400;
 
-export function normalizeWord(value) {
-  return String(value ?? "").normalize("NFKC").trim().toLocaleLowerCase("en-US");
+export function normalizeWord(value, language = "en") {
+  try { return String(value ?? "").normalize("NFKC").trim().toLocaleLowerCase(language); }
+  catch { return String(value ?? "").normalize("NFKC").trim().toLowerCase(); }
 }
+function wordLength(word) { return Array.from(word).length; }
 
 export function evaluateGuess(guess, answer) {
-  const result = Array(guess.length).fill("absent");
+  const letters = Array.from(guess);
+  const answerLetters = Array.from(answer);
+  const result = Array(letters.length).fill("absent");
   const remaining = new Map();
-
-  for (let i = 0; i < answer.length; i++) {
-    if (guess[i] === answer[i]) result[i] = "correct";
-    else remaining.set(answer[i], (remaining.get(answer[i]) || 0) + 1);
+  for (let i = 0; i < answerLetters.length; i++) {
+    if (letters[i] === answerLetters[i]) result[i] = "correct";
+    else remaining.set(answerLetters[i], (remaining.get(answerLetters[i]) || 0) + 1);
   }
-  for (let i = 0; i < guess.length; i++) {
+  for (let i = 0; i < letters.length; i++) {
     if (result[i] === "correct") continue;
-    const count = remaining.get(guess[i]) || 0;
-    if (count > 0) {
-      result[i] = "present";
-      remaining.set(guess[i], count - 1);
-    }
+    const count = remaining.get(letters[i]) || 0;
+    if (count > 0) { result[i] = "present"; remaining.set(letters[i], count - 1); }
   }
   return result;
 }
@@ -30,8 +33,9 @@ export function validateHardMode(guess, history) {
 
   for (const entry of history) {
     const counts = new Map();
-    for (let i = 0; i < entry.word.length; i++) {
-      const letter = entry.word[i];
+    const wordLetters = Array.from(entry.word);
+    for (let i = 0; i < wordLetters.length; i++) {
+      const letter = wordLetters[i];
       const result = entry.result[i];
       if (result === "correct") fixed.set(i, letter);
       if (result === "correct" || result === "present") {
@@ -50,7 +54,7 @@ export function validateHardMode(guess, history) {
   }
 
   for (const [letter, count] of requiredCounts) {
-    const supplied = [...guess].filter(char => char === letter).length;
+    const supplied = Array.from(guess).filter(char => char === letter).length;
     if (supplied < count) {
       return { valid: false, reason: "REQUIRED_LETTER", message: `Your guess must contain at least ${count} occurrence(s) of '${letter}'.` };
     }
@@ -58,8 +62,10 @@ export function validateHardMode(guess, history) {
 
   // Yellow letters cannot remain in the exact position where they were yellow.
   for (const entry of history) {
-    for (let i = 0; i < entry.word.length; i++) {
-      if (entry.result[i] === "present" && guess[i] === entry.word[i]) {
+    const wordLetters = Array.from(entry.word);
+    const guessLetters = Array.from(guess);
+    for (let i = 0; i < wordLetters.length; i++) {
+      if (entry.result[i] === "present" && guessLetters[i] === wordLetters[i]) {
         return { valid: false, reason: "YELLOW_POSITION", message: "Previously revealed yellow letters cannot remain in the same position." };
       }
     }
@@ -148,26 +154,167 @@ function wordList(value) {
   }
   return [];
 }
+const REMOTE_DICTIONARIES = {
+  "wordle-list": {
+    url: "https://raw.githubusercontent.com/tabatkins/wordle-list/main/words",
+    language: "en", format: "lines", answersFrom: "wordle"
+  },
+  english: {
+    url: "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt",
+    language: "en", format: "lines"
+  },
+  enable: {
+    url: "https://raw.githubusercontent.com/dolph/dictionary/master/enable1.txt",
+    language: "en", format: "lines"
+  },
+  unix: {
+    url: "https://raw.githubusercontent.com/dolph/dictionary/master/unix-words",
+    language: "en", format: "lines"
+  },
+  sowpods: {
+    url: "https://raw.githubusercontent.com/FlandersBurger/scrabble-dictionary/main/en/sowpods.txt",
+    language: "en", format: "lines"
+  },
+  twl: {
+    url: "https://raw.githubusercontent.com/FlandersBurger/scrabble-dictionary/main/en/twl.txt",
+    language: "en", format: "lines"
+  },
+  "wordle-es": {
+    url: "https://raw.githubusercontent.com/FlandersBurger/scrabble-dictionary/main/es/file2017.txt",
+    language: "es", format: "lines"
+  },
+  "wordle-fr": {
+    url: "https://raw.githubusercontent.com/FlandersBurger/scrabble-dictionary/main/fr/ods8.txt",
+    language: "fr", format: "lines"
+  },
+  "wordle-de": {
+    url: "https://raw.githubusercontent.com/FlandersBurger/scrabble-dictionary/main/de/wordlist.txt",
+    language: "de", format: "lines"
+  },
+  "wordle-it": {
+    url: "https://raw.githubusercontent.com/FlandersBurger/scrabble-dictionary/main/it/zinga.txt",
+    language: "it", format: "lines"
+  },
+  "wordle-pt": {
+    url: "https://raw.githubusercontent.com/FlandersBurger/scrabble-dictionary/main/pt/wordlist.txt",
+    language: "pt", format: "lines"
+  },
+  "wordle-nl": {
+    url: "https://raw.githubusercontent.com/FlandersBurger/scrabble-dictionary/main/nl/letterlicious.txt",
+    language: "nl", format: "lines"
+  },
+  "wordle-pl": {
+    url: "https://raw.githubusercontent.com/FlandersBurger/scrabble-dictionary/main/pl/sjp.txt",
+    language: "pl", format: "lines"
+  },
+  "wordle-tr": {
+    url: "https://raw.githubusercontent.com/FlandersBurger/scrabble-dictionary/main/tr/kelimelik.txt",
+    language: "tr", format: "lines"
+  }
+};
+
+async function fetchRemoteText(url) {
+  const request = new Request(url, { headers: { "accept": "text/plain" } });
+  const edgeCache = globalThis.caches?.default;
+  if (edgeCache) {
+    try {
+      const cached = await edgeCache.match(request);
+      if (cached) return cached.text();
+    } catch { /* Fall through to the upstream fetch. */ }
+  }
+  const response = await fetch(request);
+  if (!response.ok) throw new Error(`Dictionary source returned HTTP ${response.status}.`);
+  const declaredSize = Number(response.headers.get("content-length") || 0);
+  if (declaredSize > 12 * 1024 * 1024) throw new Error("Dictionary source exceeds the 12 MB limit.");
+  const text = await response.text();
+  if (!text || text.length > 12 * 1024 * 1024) throw new Error("Dictionary source is empty or too large.");
+  if (edgeCache) {
+    try {
+      await edgeCache.put(request, new Response(text, { headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": `public, max-age=${REMOTE_CACHE_SECONDS}`
+      }}));
+    } catch { /* Cache failures must not make a healthy upstream unavailable. */ }
+  }
+  return text;
+}
+function parseRemoteWords(text, language) {
+  const words = text.split(/[\r\n\t ,;]+/)
+    .map(value => normalizeWord(value, language))
+    .filter(value => value && validShape(value) && wordLength(value) <= 32);
+  return [...new Set(words)];
+}
+async function loadDictionary(env, id) {
+  const local = await asset(env, `/dictionaries/${id}.json`);
+  if (local && typeof local === "object") return local;
+  const source = REMOTE_DICTIONARIES[id];
+  if (!source) return null;
+  const raw = await fetchRemoteText(source.url);
+  const words = parseRemoteWords(raw, source.language);
+  if (!words.length) throw new Error(`Dictionary '${id}' returned no usable words.`);
+  let answers = words;
+  if (source.answersFrom === "wordle") {
+    const answerData = await asset(env, `/dictionaries/${source.answersFrom}.json`);
+    answers = wordList(answerData?.answers).map(word => normalizeWord(word, source.language));
+  }
+  return {
+    id, name: id, language: source.language,
+    description: `Live word list proxied from GitHub raw content.`,
+    source: source.url, guesses: words, answers: answers.length ? answers : words
+  };
+}
 async function dictionary(env, id) {
   if (!/^[a-z0-9-]{1,48}$/.test(id)) return null;
-  if (cache.has(`dict:${id}`)) return cache.get(`dict:${id}`);
+  if (dictionaryCache.has(id)) {
+    const value = dictionaryCache.get(id);
+    dictionaryCache.delete(id); dictionaryCache.set(id, value);
+    return value;
+  }
   let data;
-  try { data = await asset(env, `/dictionaries/${id}.json`); }
+  try { data = await loadDictionary(env, id); }
   catch { return null; }
   if (!data || typeof data !== "object") return null;
+  const language = data.language || REMOTE_DICTIONARIES[id]?.language || "en";
   const guesses = [...new Set(wordList(data.guesses ?? data.validGuesses ?? data.words)
-    .map(normalizeWord).filter(word => word && validShape(word)))];
+    .map(word => normalizeWord(word, language)).filter(word => word && validShape(word)))];
   const answers = [...new Set(wordList(data.answers ?? data.answerWords)
-    .map(normalizeWord).filter(word => word && validShape(word)))];
+    .map(word => normalizeWord(word, language)).filter(word => word && validShape(word)))];
   if (!guesses.length || !answers.length) return null;
-  const value = { ...data, guesses: new Set(guesses), answers };
-  cache.set(`dict:${id}`, value);
+  const value = { ...data, language, guesses: new Set(guesses), answers };
+  dictionaryCache.set(id, value);
+  while (dictionaryCache.size > 2) dictionaryCache.delete(dictionaryCache.keys().next().value);
   return value;
 }
+async function probeDictionary(env, id) {
+  const cached = availabilityCache.get(id);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const local = await asset(env, `/dictionaries/${id}.json`);
+  if (local && typeof local === "object") {
+    const value = await dictionary(env, id);
+    const result = value ? {
+      available: true, remote: false,
+      answerCount: value.answers.length, guessCount: value.guesses.size,
+      lengths: [...new Set([...value.guesses].map(wordLength))].sort((a,b) => a-b)
+    } : { available: false, remote: false };
+    availabilityCache.set(id, { value: result, expiresAt: Date.now() + 15 * 60 * 1000 });
+    return result;
+  }
+  const source = REMOTE_DICTIONARIES[id];
+  if (!source) return { available: false, remote: false };
+  let available = false;
+  try {
+    const response = await fetch(source.url, { method: "HEAD", headers: { "accept": "text/plain" } });
+    available = response.ok;
+  } catch { available = false; }
+  const result = { available, remote: true, source: source.url };
+  availabilityCache.set(id, { value: result, expiresAt: Date.now() + 15 * 60 * 1000 });
+  return result;
+}
+
 async function profanityWords(env) {
   if (cache.has("profanity")) return cache.get("profanity");
   const data = await asset(env, "/filters/profanity.json");
-  const words = new Set((data?.words || []).map(normalizeWord));
+  const words = new Set((data?.words || []).map(word => normalizeWord(word)));
   cache.set("profanity", words);
   return words;
 }
@@ -221,7 +368,7 @@ async function createGame(env, id, settings, mode) {
   const blocked = await profanityWords(env);
   const source = settings.answerPolicy === "all-valid" ? [...dict.guesses] : dict.answers;
   const pool = source.filter(word =>
-    word.length === settings.length &&
+    wordLength(word) === settings.length &&
     validShape(word) &&
     (settings.profanity === "off" || !blocked.has(word))
   );
@@ -252,19 +399,19 @@ const REGISTRY = [
   ["wordle-list", "Wordle accepted guesses", "en", "Five-letter accepted guess vocabulary"],
   ["english", "English (dwyl)", "en", "Large general English vocabulary"],
   ["enable", "ENABLE", "en", "English word-game vocabulary"],
-  ["sowpods", "SOWPODS", "en", "International Scrabble vocabulary"],
+  ["sowpods", "SOWPODS", "en", "Collins international Scrabble vocabulary"],
   ["twl", "TWL", "en", "North American Scrabble vocabulary"],
   ["unix", "Unix words", "en", "Unix word-list vocabulary"],
-  ["wordle-es", "Wordle Spanish", "es", "Spanish word-game vocabulary"],
-  ["wordle-fr", "Wordle French", "fr", "French word-game vocabulary"],
-  ["wordle-de", "Wordle German", "de", "German word-game vocabulary"],
-  ["wordle-it", "Wordle Italian", "it", "Italian word-game vocabulary"],
-  ["wordle-pt", "Wordle Portuguese", "pt", "Portuguese word-game vocabulary"],
-  ["wordle-nl", "Wordle Dutch", "nl", "Dutch word-game vocabulary"],
+  ["wordle-es", "Spanish", "es", "Spanish word-game vocabulary"],
+  ["wordle-fr", "French", "fr", "French word-game vocabulary"],
+  ["wordle-de", "German", "de", "German word-game vocabulary"],
+  ["wordle-it", "Italian", "it", "Italian word-game vocabulary"],
+  ["wordle-pt", "Portuguese", "pt", "Portuguese word-game vocabulary"],
+  ["wordle-nl", "Dutch", "nl", "Dutch word-game vocabulary"],
   ["wordle-sv", "Wordle Swedish", "sv", "Swedish word-game vocabulary"],
-  ["wordle-pl", "Wordle Polish", "pl", "Polish word-game vocabulary"],
+  ["wordle-pl", "Polish", "pl", "Polish word-game vocabulary"],
   ["wordle-fi", "Wordle Finnish", "fi", "Finnish word-game vocabulary"],
-  ["wordle-tr", "Wordle Turkish", "tr", "Turkish word-game vocabulary"]
+  ["wordle-tr", "Turkish", "tr", "Turkish word-game vocabulary"]
 ];
 
 async function route(request, env) {
@@ -275,10 +422,10 @@ async function route(request, env) {
   }});
   const parts = url.pathname.slice(API.length).split("/").filter(Boolean);
   if (!parts.length && request.method === "GET") {
-    return json({ name: "Speedle API", version: "1.2.0", base: API, docs: `${API}/docs`, frontend: "/" });
+    return json({ name: "Speedle API", version: "1.3.0", base: API, docs: `${API}/docs`, frontend: "/" });
   }
   if (parts[0] === "health" && request.method === "GET") {
-    return json({ ok: true, service: "speedle-api", version: "1.2.0", timestamp: new Date().toISOString() });
+    return json({ ok: true, service: "speedle-api", version: "1.3.0", timestamp: new Date().toISOString() });
   }
   if (parts[0] === "config" && request.method === "GET") {
     return json({
@@ -294,20 +441,15 @@ async function route(request, env) {
     });
   }
   if (parts[0] === "dictionaries" && request.method === "GET") {
-    const result = [];
-    for (const [id, name, language, description] of REGISTRY) {
-      // One malformed/missing dataset must not take down the whole registry.
-      let dict = null;
-      try { dict = await dictionary(env, id); } catch { dict = null; }
-      result.push({
-        id, name, language, description, available: Boolean(dict),
-        ...(dict ? {
-          answerCount: dict.answers.length,
-          guessCount: dict.guesses.size,
-          lengths: [...new Set([...dict.guesses].map(w => w.length))].sort((a,b) => a-b)
-        } : {})
-      });
-    }
+    // Probe upstream availability without downloading every multi-megabyte list.
+    const result = await Promise.all(REGISTRY.map(async ([id, name, language, description]) => {
+      try {
+        const status = await probeDictionary(env, id);
+        return { id, name, language, description, ...status };
+      } catch {
+        return { id, name, language, description, available: false, remote: Boolean(REMOTE_DICTIONARIES[id]) };
+      }
+    }));
     return json({ count: result.length, availableCount: result.filter(x => x.available).length, dictionaries: result });
   }
   if (parts[0] === "docs" && request.method === "GET") {
@@ -332,7 +474,7 @@ async function route(request, env) {
 
   const id = parts[0];
   const dict = await dictionary(env, id);
-  if (!dict) return fail("DICTIONARY_NOT_FOUND", `Dictionary '${id}' is unavailable or not imported.`, 404);
+  if (!dict) return fail("DICTIONARY_NOT_FOUND", `Dictionary '${id}' is unavailable or its upstream source could not be reached.`, 404);
   const action = parts[1];
 
   if (action === "info" && request.method === "GET") {
@@ -340,7 +482,7 @@ async function route(request, env) {
       id, name: dict.name || id, description: dict.description || "",
       language: dict.language || "en", source: dict.source || "Custom dataset",
       answerCount: dict.answers.length, guessCount: dict.guesses.size,
-      lengths: [...new Set([...dict.guesses].map(w => w.length))].sort((a,b) => a-b)
+      lengths: [...new Set([...dict.guesses].map(wordLength))].sort((a,b) => a-b)
     });
   }
 
@@ -350,30 +492,30 @@ async function route(request, env) {
     if (!Number.isInteger(length) || length < 2 || length > 15) return fail("INVALID_LENGTH", "length must be 2–15.");
     if (!["strict", "off"].includes(filter)) return fail("INVALID_FILTER", "profanity must be strict or off.");
     const blocked = await profanityWords(env);
-    const pool = [...dict.guesses].filter(w => w.length === length && (filter === "off" || !blocked.has(w)));
+    const pool = [...dict.guesses].filter(w => wordLength(w) === length && (filter === "off" || !blocked.has(w)));
     if (!pool.length) return fail("NO_WORDS", "No words match the requested length and filter.", 404);
     return json({ dictionary: id, word: pool[crypto.getRandomValues(new Uint32Array(1))[0] % pool.length], length });
   }
 
   if (action === "words" && parts[2] === "search" && request.method === "GET") {
-    const q = normalizeWord(url.searchParams.get("q") || "");
+    const q = normalizeWord(url.searchParams.get("q") || "", dict.language);
     const length = Number(url.searchParams.get("length") || 0);
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 25)));
     if (!q && !length) return fail("MISSING_QUERY", "Provide q or length.");
     const matches = [...dict.guesses].filter(word =>
-      (!q || word.includes(q)) && (!length || word.length === length)
+      (!q || word.includes(q)) && (!length || wordLength(word) === length)
     ).sort().slice(0, limit);
     return json({ dictionary: id, query: q, length: length || null, count: matches.length, words: matches });
   }
 
   if (action === "words" && parts[2] === "validate" && parts[3] && request.method === "GET") {
-    const word = normalizeWord(parts[3]);
+    const word = normalizeWord(parts[3], dict.language);
     const length = Number(url.searchParams.get("length") || word.length);
     const filter = url.searchParams.get("profanity") || "strict";
     const blocked = await profanityWords(env);
     const isBlocked = blocked.has(word);
-    const valid = dict.guesses.has(word) && word.length === length && validShape(word) && (filter === "off" || !isBlocked);
-    return json({ dictionary: id, word, valid, length: word.length, ...(isBlocked ? { filtered: true } : {}) });
+    const valid = dict.guesses.has(word) && wordLength(word) === length && validShape(word) && (filter === "off" || !isBlocked);
+    return json({ dictionary: id, word, valid, length: wordLength(word), ...(isBlocked ? { filtered: true } : {}) });
   }
 
   if (action === "game" && ["new", "daily"].includes(parts[2]) && request.method === "POST") {
@@ -408,8 +550,8 @@ async function route(request, env) {
     catch (e) { return fail("INVALID_TOKEN", e.message, 401); }
     if (state.settings.dictionary !== id) return fail("DICTIONARY_MISMATCH", "Token belongs to another dictionary.", 409);
     if (state.status !== "playing") return fail("GAME_FINISHED", "This game has already finished.", 409);
-    const guess = normalizeWord(body.guess);
-    if (!validShape(guess) || guess.length !== state.settings.length) {
+    const guess = normalizeWord(body.guess, dict.language);
+    if (!validShape(guess) || wordLength(guess) !== state.settings.length) {
       return fail("INVALID_GUESS_SHAPE", `Guess must contain exactly ${state.settings.length} letters.`);
     }
     const currentDict = await dictionary(env, id);
@@ -432,12 +574,12 @@ async function route(request, env) {
   if (action === "evaluate" && request.method === "POST") {
     let body;
     try { body = await request.json(); } catch { return fail("INVALID_JSON", "Body must be JSON."); }
-    const guess = normalizeWord(body.guess);
+    const guess = normalizeWord(body.guess, dict.language);
     const answer = normalizeWord(body.answer);
-    if (!guess || !answer || guess.length !== answer.length || !validShape(guess) || !validShape(answer)) {
+    if (!guess || !answer || wordLength(guess) !== wordLength(answer) || !validShape(guess) || !validShape(answer)) {
       return fail("INVALID_INPUT", "guess and answer must be alphabetic words of equal length.");
     }
-    return json({ guess, length: guess.length, result: evaluateGuess(guess, answer) });
+    return json({ guess, length: wordLength(guess), result: evaluateGuess(guess, answer) });
   }
 
   return fail("NOT_FOUND", "Endpoint not found.", 404);

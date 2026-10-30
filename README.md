@@ -149,3 +149,20 @@ speedle/
 ├── wrangler.toml
 └── package.json
 ```
+
+
+## Live dictionary proxy (v1.3)
+
+The Worker can proxy allowlisted plain-text dictionaries from `raw.githubusercontent.com`; importing them into `public/dictionaries` is no longer required for these sources. The `/dictionaries` registry checks upstream availability with lightweight HEAD requests instead of downloading every multi-megabyte list. The selected dictionary is downloaded on first use and cached at the edge for 24 hours when the Workers Cache API is available; parsed dictionary objects are kept in a small two-dictionary isolate cache to limit memory use. If an upstream source is unavailable, that dictionary is reported as unavailable without failing the whole `/api/v1/dictionaries` response.
+
+Live sources currently configured:
+
+- Wordle accepted guesses: `tabatkins/wordle-list` (curated answers continue to come from the local `wordle` dataset).
+- English: `dwyl/english-words` (`words_alpha.txt`).
+- ENABLE and Unix words: `dolph/dictionary`.
+- SOWPODS and TWL: `FlandersBurger/scrabble-dictionary`.
+- Spanish, French, German, Italian, Portuguese, Dutch, Polish, and Turkish word lists: `FlandersBurger/scrabble-dictionary`.
+
+The multilingual sources are general language/Scrabble vocabularies, not official Wordle answer lists. Their accepted words are also used as their answer pool because those sources do not provide a separate curated Wordle answer set. Swedish and Finnish remain listed but unavailable until a verified source is configured. Language-aware casing and Unicode code-point word lengths are supported.
+
+The Worker only fetches hard-coded source URLs; clients cannot supply arbitrary proxy URLs.

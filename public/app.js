@@ -37,7 +37,7 @@ async function loadDictionaries() {
   for (const item of state.dicts) {
     const option = document.createElement("option");
     option.value = item.id;
-    option.textContent = `${item.name} · ${item.available ? `${item.guessCount} guesses` : "not imported"}`;
+    option.textContent = `${item.name} · ${item.available ? (item.guessCount ? `${item.guessCount} guesses` : "available") : "source unavailable"}`;
     option.disabled = !item.available;
     select.append(option);
   }
@@ -49,7 +49,7 @@ async function loadDictionaries() {
 function updateDictionaryInfo() {
   const item = state.dicts.find(x => x.id === $("dictionary").value);
   $("dictionaryInfo").textContent = item
-    ? `${item.description} · ${item.available ? `${item.answerCount} answers / ${item.guessCount} accepted guesses` : "Dataset not installed"}`
+    ? `${item.description} · ${item.available ? (item.guessCount ? `${item.answerCount} answers / ${item.guessCount} accepted guesses` : "Live source · loads when selected") : "Source unavailable"}`
     : "No dictionary selected.";
 }
 function paint() {
