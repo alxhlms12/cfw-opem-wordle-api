@@ -3,108 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f5f5">
+  <meta name="theme-color" content="#f4f4f4">
+  <meta name="description" content="Speedle — a configurable, dictionary-driven word game.">
   <title>Speedle</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="/">speedle<span>.</span></a>
-    <div class="top-actions">
-      <button id="settingsToggle" class="quiet-button" type="button">Settings</button>
-      <button id="newGame" class="solid-button" type="button">New game</button>
+<header class="topbar">
+  <a class="brand" href="/">speedle<span>.</span></a>
+  <div class="header-actions">
+    <button id="dailyGame" class="button secondary">Daily</button>
+    <button id="newGame" class="button primary">New game</button>
+    <button id="settingsOpen" class="icon-button" aria-label="Settings" title="Settings">⚙</button>
+  </div>
+</header>
+<main class="shell">
+  <section class="game" aria-label="Word game">
+    <p id="remaining" class="game-meta">Guess the 5-letter word</p>
+    <div id="board" class="board"></div>
+    <p id="notice" class="notice" role="status" aria-live="polite"></p>
+    <div id="keyboard" class="keyboard"></div>
+  </section>
+</main>
+<dialog id="settingsDialog" class="settings-dialog">
+  <aside id="settings" class="panel">
+    <div class="panel-title"><div><p class="eyebrow">SPEEDLE</p><h2>Settings</h2></div><button id="settingsClose" class="icon-button" aria-label="Close settings">×</button></div>
+    <label>API base URL<input id="apiBase" value="/api/v1" spellcheck="false"></label>
+    <label>Dictionary<select id="dictionary"><option>Loading…</option></select></label>
+    <p id="dictionaryInfo" class="help">Dictionary metadata appears here.</p>
+    <div class="field-grid">
+      <label>Mode<select id="mode"><option value="unlimited">Unlimited</option><option value="daily">Daily</option></select></label>
+      <label>Answer pool<select id="answerPolicy"><option value="curated">Curated answers</option><option value="all-valid">All accepted words</option></select></label>
     </div>
-  </header>
-
-  <main class="layout">
-    <section class="play-area">
-      <div class="game-heading">
-        <div>
-          <p class="eyebrow" id="modeLabel">UNLIMITED</p>
-          <h1 id="gameTitle">Speedle</h1>
-          <p id="gameSubtitle" class="muted">Guess the hidden word.</p>
-        </div>
-        <div class="status" id="status">Ready</div>
-      </div>
-
-      <div id="board" class="board" aria-label="Game board"></div>
-      <p id="message" class="message" role="status"></p>
-
-      <div class="keyboard" id="keyboard" aria-label="On-screen keyboard"></div>
-      <div class="play-actions">
-        <button id="submitGuess" class="solid-button" type="button">Submit guess</button>
-        <button id="clearGuess" class="quiet-button" type="button">Clear</button>
-      </div>
-    </section>
-
-    <aside id="settingsPanel" class="settings-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">CONTROL PANEL</p>
-          <h2>Configuration</h2>
-        </div>
-        <button id="settingsClose" class="quiet-button" type="button" aria-label="Close settings">Close</button>
-      </div>
-
-      <label>API base URL
-        <input id="apiBase" type="url" value="/api/v1" spellcheck="false">
-      </label>
-      <label>Dictionary
-        <select id="dictionary"><option value="wordle">Loading dictionaries…</option></select>
-      </label>
-      <div class="two-col">
-        <label>Game mode
-          <select id="mode">
-            <option value="unlimited">Unlimited</option>
-            <option value="daily">Daily</option>
-          </select>
-        </label>
-        <label>Word length
-          <input id="length" type="number" min="2" max="15" value="5">
-        </label>
-      </div>
-      <div class="two-col">
-        <label>Maximum attempts
-          <input id="maxAttempts" type="number" min="1" max="20" value="6">
-        </label>
-        <label>Hard mode
-          <select id="hardMode">
-            <option value="false">Off</option>
-            <option value="true">On</option>
-          </select>
-        </label>
-      </div>
-      <label>Profanity filter
-        <select id="profanity">
-          <option value="strict">Strict (default)</option>
-          <option value="off">Off</option>
-        </select>
-      </label>
-      <div class="section-rule"></div>
-      <p class="eyebrow">DISPLAY</p>
-      <label class="check-row"><input id="keyboardEnabled" type="checkbox" checked> On-screen keyboard</label>
-      <label class="check-row"><input id="colorHints" type="checkbox" checked> Color feedback</label>
-      <label class="check-row"><input id="highContrast" type="checkbox"> High contrast</label>
-      <label class="check-row"><input id="showLabels" type="checkbox"> Text labels on tiles</label>
-      <div class="section-rule"></div>
-      <p class="eyebrow">API UTILITIES</p>
-      <button id="refreshDictionaries" class="wide-button" type="button">Refresh dictionary list</button>
-      <button id="dictionaryInfo" class="wide-button" type="button">Get dictionary info</button>
-      <button id="apiHealth" class="wide-button" type="button">Check API health</button>
-      <label>Word to validate
-        <input id="validateWord" type="text" maxlength="15" placeholder="Enter a word">
-      </label>
-      <button id="validateButton" class="wide-button" type="button">Validate word</button>
-      <button id="randomWord" class="wide-button" type="button">Get random word</button>
-      <div class="two-col">
-        <label>Evaluation guess<input id="evalGuess" type="text" maxlength="15" placeholder="guess"></label>
-        <label>Evaluation answer<input id="evalAnswer" type="text" maxlength="15" placeholder="answer"></label>
-      </div>
-      <button id="evaluateButton" class="wide-button" type="button">Evaluate guess</button>
-      <pre id="apiOutput" class="api-output">API responses appear here.</pre>
-      <p class="footnote">Games are stateless on the server. Your encrypted game token is stored locally in this browser.</p>
-    </aside>
-  </main>
-  <script src="/app.js"></script>
+    <label>Word length <output id="lengthValue">5</output><input id="length" type="range" min="2" max="15" value="5"></label>
+    <label>Maximum attempts <output id="attemptsValue">6</output><input id="attempts" type="range" min="1" max="20" value="6"></label>
+    <div class="field-grid">
+      <label>Token lifetime<select id="ttl"><option value="1">1 hour</option><option value="6">6 hours</option><option value="24" selected>24 hours</option><option value="72">3 days</option><option value="168">7 days</option></select></label>
+      <label>Profanity filter<select id="profanity"><option value="strict">Strict</option><option value="off">Off</option></select></label>
+    </div>
+    <label class="check"><input id="hardMode" type="checkbox"> Hard mode</label>
+    <div class="divider"></div>
+    <p class="eyebrow">DISPLAY</p>
+    <label class="check"><input id="keyboardEnabled" type="checkbox" checked> On-screen keyboard</label>
+    <label class="check"><input id="colorFeedback" type="checkbox" checked> Color feedback</label>
+    <label class="check"><input id="highContrast" type="checkbox"> High contrast</label>
+    <label class="check"><input id="tileLabels" type="checkbox"> Show result labels</label>
+    <div class="divider"></div>
+    <p class="eyebrow">DICTIONARY TOOLS</p>
+    <label>Word<input id="utilityWord" placeholder="Enter a word"></label>
+    <div class="field-grid">
+      <button id="validateWord" class="button secondary">Validate</button>
+      <button id="randomWord" class="button secondary">Random word</button>
+    </div>
+    <button id="resume" class="button secondary full">Resume saved game</button>
+    <button id="health" class="button secondary full">Check API health</button>
+    <button id="refresh" class="button secondary full">Refresh dictionaries</button>
+    <pre id="apiOutput" class="api-output" hidden></pre>
+    <p class="footnote">Games use encrypted stateless tokens. The latest token is saved in this browser for resume.</p>
+  </aside>
+</dialog>
+<script src="/app.js"></script>
 </body>
 </html>

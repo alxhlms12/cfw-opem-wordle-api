@@ -1,36 +1,18 @@
-# Speedle
+# Speedle 1.1
 
-A stateless, dictionary-driven Wordle-style REST API and a minimal frontend.
+Speedle is a dictionary-driven, stateless Wordle-style REST API and a minimal frontend for Cloudflare Workers.
 
-## Included
-
-- Cloudflare Worker REST API.
-- Speedle frontend with no animation/transition system.
-- Dictionary namespace: `/api/v1/{dictionary}/...`.
-- Variable word lengths (2–15) and attempt counts (1–20).
-- Daily and unlimited games.
-- Hard mode.
-- Optional profanity filtering.
-- Duplicate-letter-safe Wordle evaluation.
-- AES-GCM encrypted stateless game tokens.
-- Dictionary importer and profanity-list importer.
-- Browser UI settings for API URL, dictionary, mode, word length, attempts, hard mode, profanity, keyboard, feedback colors, contrast, and tile labels.
-
-## Important: first build
-
-The repository includes a small five-letter starter dictionary so the project can run immediately. Import the larger upstream lists before deploying:
+## Run
 
 ```powershell
 npm install
 npm run dictionaries:build
+Copy-Item .dev.vars.example .dev.vars
 ```
 
-The importer writes datasets into `public/dictionaries/` and merged profanity data into `public/filters/profanity.json`.
-
-Then create `.dev.vars` from `.dev.vars.example` and set a random secret of at least 32 characters.
+Set `GAME_SECRET` in `.dev.vars` to a random secret with at least 32 characters.
 
 ```powershell
-Copy-Item .dev.vars.example .dev.vars
 npm run dev
 ```
 
@@ -41,96 +23,122 @@ npx wrangler secret put GAME_SECRET
 npm run deploy
 ```
 
-Use the same secret across all Worker instances. Rotating it invalidates existing game tokens.
+## Features
 
-## API
+### API
+- Dictionary namespaces: `/api/v1/{dictionary}/...`
+- Stateless AES-GCM encrypted game tokens.
+- Daily and unlimited games.
+- Variable word lengths: 2–15.
+- Configurable attempts: 1–20.
+- Hard mode with green-position, yellow-position, and revealed-letter-count constraints.
+- Configurable answer pool: curated answers or all accepted words.
+- Configurable token lifetime: 1–168 hours.
+- Duplicate-letter-safe feedback.
+- Word validation, random words, dictionary search, metadata, and health/config endpoints.
+- CORS and consistent JSON errors.
+- No accounts, D1, KV, or Durable Objects required.
 
-Base path: `/api/v1`
+### Frontend
+- Responsive desktop/mobile layout.
+- Instant, animation-free interactions.
+- API base URL override.
+- Dictionary selection and metadata.
+- Daily/unlimited modes.
+- Word length, attempt count, hard mode, answer policy, profanity, and token lifetime controls.
+- Resume saved game.
+- Physical and on-screen keyboard support.
+- High-contrast and no-color modes.
+- Optional result labels.
+- Dictionary validation and random-word tools.
+- API response inspector.
+
+## API routes
+
+Base: `/api/v1`
 
 | Method | Route | Description |
 |---|---|---|
-| GET | `/dictionaries` | List dictionaries and import status |
+| GET | `/health` | Health check |
+| GET | `/config` | Supported configuration limits |
+| GET | `/dictionaries` | Dictionary registry and availability |
+| GET | `/docs` | Machine-readable route overview |
 | GET | `/{dictionary}/info` | Dictionary metadata |
 | GET | `/{dictionary}/words/random?length=5` | Random accepted word |
-| GET | `/{dictionary}/words/validate/{word}` | Validate a guess |
-| POST | `/{dictionary}/game/new` | Start unlimited game |
-| POST | `/{dictionary}/game/daily` | Start deterministic daily game |
-| POST | `/{dictionary}/game/guess` | Submit guess using encrypted token |
-| POST | `/{dictionary}/evaluate` | Evaluate a guess against a supplied answer |
+| GET | `/{dictionary}/words/search?q=app&length=5` | Search vocabulary |
+| GET | `/{dictionary}/words/validate/{word}` | Validate guess |
+| POST | `/{dictionary}/game/new` | Unlimited game |
+| POST | `/{dictionary}/game/daily` | Daily game |
+| POST | `/{dictionary}/game/guess` | Submit guess |
+| POST | `/{dictionary}/game/resume` | Validate and restore token |
+| POST | `/{dictionary}/evaluate` | Evaluate guess against answer |
 
-Example:
-
-```http
-POST /api/v1/wordle/game/new
-Content-Type: application/json
-
-{
-  "length": 5,
-  "maxAttempts": 6,
-  "hardMode": false,
-  "profanity": "strict"
-}
-```
-
-A game response contains an encrypted `token`. Send the newest token with each guess:
+Example game settings:
 
 ```json
 {
-  "token": "RETURNED_TOKEN",
-  "guess": "crane"
+  "length": 6,
+  "maxAttempts": 7,
+  "hardMode": true,
+  "profanity": "strict",
+  "answerPolicy": "curated",
+  "tokenTtlHours": 24
 }
 ```
 
-The token is AES-GCM encrypted. The answer is not readable by decoding the token. The server does not store game sessions or require accounts. The client must retain the newest token; losing it loses that game.
+The latest token returned by every successful guess must replace the previous token.
 
-## Dictionaries
+## Stateless security model
 
-The importer currently includes:
+The answer and game state are encrypted using AES-GCM with a Worker secret. The browser only receives ciphertext. The server does not persist game sessions.
 
-- `wordle`: curated answers + accepted guesses from Atagoxx/wordle-beyond-the-list.
-- `wordle-list`: five-letter accepted-guess vocabulary from tabatkins/wordle-list.
-- `english`: dwyl/english-words `words_alpha.txt`.
-- `enable`: ENABLE1 word list.
+Statelessness has inherent limits:
+- A user can replay an earlier token.
+- Daily games can be restarted.
+- There is no server-side per-user statistics or history.
+- Clearing the browser's saved token loses the current game.
+- A stateless API cannot guarantee one daily attempt per person without identity or storage.
 
-The API registry also reserves language-specific IDs for custom imports (`wordle-es`, `wordle-fr`, `wordle-de`, `wordle-it`, `wordle-pt`, `wordle-nl`, `wordle-sv`, `wordle-pl`, `wordle-fi`, `wordle-tr`, `wordle-ja`). They will report unavailable until matching datasets are imported. Japanese requires a tokenizer/normalization strategy beyond the current alphabetic importer.
+The API does not claim to prevent replay. Add server-side storage if that becomes a requirement.
 
-Do not treat every dictionary word as a suitable puzzle answer. General dictionaries are accepted-guess pools by default; the importer currently uses the same list as the answer pool when no separate answer list is provided. For production, curate answer pools per language and source.
+## Dictionary import
 
-## Profanity sources
+```powershell
+npm run dictionaries:build
+```
 
-`npm run dictionaries:build` attempts to merge:
+The importer creates local snapshots in `public/dictionaries/`. It includes English source lists for Wordle, dwyl English words, and ENABLE. Other dictionary IDs in the registry remain unavailable until you add datasets.
 
-- LDNOOBW English list (CC BY 4.0).
-- coffee-and-fun/google-profanity-words English list (MIT).
-- censor-text/profanity-list English list (Unlicense; archived).
+The registry is not a claim that every listed language dataset is already bundled. Only imported files are advertised as available.
 
-The filter is exact-word matching. It is applied to answer selection and guess acceptance. It can produce false positives; `profanity=off` disables it. Review each upstream license and retain attribution in redistributed builds.
+## Profanity filtering
 
-## External dictionary lookup providers
+The importer merges the configured LDNOOBW, Google Profanity Words, and Censor-Text sources into a local exact-match list. Review the source repository and license before redistribution. Filtering can have false positives. The API supports `profanity: "off"` for dictionaries where strict filtering is unsuitable.
 
-The game engine does not call public APIs on each guess. Optional definition/enrichment providers can be added separately:
-- Datamuse word-finding API: https://www.datamuse.com/api/
-- Free Dictionary API: https://dictionaryapi.dev/
-- Tapdict dictionary API: https://tapdict.com/developers
-- Merriam-Webster API requires an API key: https://dictionaryapi.com/
+## Tests
 
-Third-party APIs are not authoritative guess validators and should not be in the gameplay critical path.
+```powershell
+npm test
+npm run check
+```
 
-## Known limitations to address before public production
+Tests cover normalization, duplicate-letter evaluation, and hard-mode constraints.
 
-- Daily puzzles are deterministic by UTC date and dictionary/length; there is no global used-answer history in stateless mode.
-- Daily mode is not account-bound and can be replayed by starting a new token.
-- Hard mode currently enforces revealed green/yellow letters, but does not yet enforce duplicate-letter count constraints.
-- `words/random` returns a word to the caller and should not be used as a secret answer endpoint.
-- Word list licensing and source terms vary. Review every dataset before redistribution.
-- API rate limiting is not enabled in this starter. Add Cloudflare rate limiting/WAF rules before exposing it publicly.
-- For multilingual datasets, update normalization and `validWordShape` to support each language's alphabet and writing system.
+## Production checklist
 
-## Project structure
+- Review dictionary source URLs, data quality, and licenses.
+- Add and curate answer pools separately from accepted-guess lists.
+- Add Cloudflare rate limiting/WAF rules for public traffic.
+- Set a strong `GAME_SECRET`; rotating it invalidates existing sessions.
+- Add per-language Unicode normalization and alphabet rules before importing non-Latin dictionaries.
+- Consider a durable store only if you need one-play-per-day enforcement, server-side statistics, or replay prevention.
+
+## Layout
 
 ```text
 speedle/
 ├── src/index.js
+├── tests/engine.test.js
 ├── scripts/build-dictionaries.mjs
 ├── public/
 │   ├── index.html
